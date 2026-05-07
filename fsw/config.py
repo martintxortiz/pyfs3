@@ -15,26 +15,21 @@ def load_system_config(path: str) -> dict[str, Any]:
 def parse_system_config(raw: dict[str, Any], root: str | Path = ".") -> dict[str, Any]:
     _require_dict(raw, "system config")
     _warn_unknown_keys(raw, {"logging", "bus", "apps"}, "system config")
-    root = Path(root)
-    bus_config = _optional_dict(raw.get("bus", {}), "bus")
-    logging_config = _optional_dict(raw.get("logging", {}), "logging")
+    bus_config = _require_dict(raw.get("bus", {}), "bus")
+    logging_config = _require_dict(raw.get("logging", {}), "logging")
     _warn_unknown_keys(bus_config, {"maxsize"}, "bus config")
     _warn_unknown_keys(logging_config, {"level"}, "logging config")
-    apps = []
-    app_names = set()
 
     raw_apps = raw.get("apps", [])
     if not isinstance(raw_apps, list):
         raise ValueError("'apps' must be a list")
 
-    for app in raw_apps:
-        apps.append(_parse_app_config(app, root, app_names))
+    app_names: set[str] = set()
+    apps = [_parse_app_config(app, Path(root), app_names) for app in raw_apps]
 
     return {
         "bus_maxsize": _positive_int(bus_config.get("maxsize", 100), "bus.maxsize"),
-        "logging": {
-            "level": str(logging_config.get("level", "INFO")),
-        },
+        "logging": {"level": str(logging_config.get("level", "INFO"))},
         "apps": apps,
     }
 
@@ -50,23 +45,21 @@ def configure_logging(config: dict[str, Any]) -> None:
 
 def load_env(path: str | Path = ".env") -> dict[str, str]:
     env_path = Path(path)
-    if not env_path.exists():
-        return {}
+    values: dict[str, str] = {}
 
-    values = {}
-    for raw in env_path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        if "=" not in line:
-            logging.getLogger(__name__).warning("Invalid .env line ignored: %s", line)
-            continue
-        key, value = line.split("=", 1)
-        values[key.strip()] = value.strip().strip("'\"")
+    if env_path.exists():
+        for raw in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                logging.getLogger(__name__).warning("Invalid .env line ignored: %s", line)
+                continue
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip().strip("'\"")
 
-    for key, value in os.environ.items():
-        if key.startswith("FSW_"):
-            values[key] = value
+    # Real environment overrides .env for FSW_* keys.
+    values.update({k: v for k, v in os.environ.items() if k.startswith("FSW_")})
     return values
 
 
@@ -146,13 +139,9 @@ def _load_class(class_path: str):
     return getattr(module, class_name)
 
 
-def _require_dict(value: Any, name: str) -> None:
+def _require_dict(value: Any, name: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{name} must be a mapping")
-
-
-def _optional_dict(value: Any, name: str) -> dict[str, Any]:
-    _require_dict(value, name)
     return value
 
 
@@ -170,7 +159,7 @@ def _bool(value: Any, name: str) -> bool:
 
 
 def _warn_unknown_keys(data: dict[str, Any], expected_keys: set[str], name: str) -> None:
-    for key in sorted(set(data) - expected_keys):
+    for key in sorted(data.keys() - expected_keys):
         logging.getLogger(__name__).warning("Unused key in %s ignored: %s", name, key)
 
 
@@ -214,7 +203,7 @@ def _parse_dict(lines: list[tuple[int, str]], index: int, indent: int):
 
 
 def _parse_list(lines: list[tuple[int, str]], index: int, indent: int):
-    items = []
+    items: list[Any] = []
     while index < len(lines):
         line_indent, text = lines[index]
         if line_indent < indent or not text.startswith("- "):
@@ -225,17 +214,18 @@ def _parse_list(lines: list[tuple[int, str]], index: int, indent: int):
         item_text = text[2:].strip()
         index += 1
 
-        if ":" in item_text:
-            key, value = _split_key_value(item_text)
-            item = {key: _parse_scalar(value)} if value else {}
-            if value == "" and index < len(lines) and lines[index][0] > line_indent:
-                item[key], index = _parse_block(lines, index, lines[index][0])
-            if index < len(lines) and lines[index][0] > line_indent:
-                extra, index = _parse_dict(lines, index, lines[index][0])
-                item.update(extra)
-            items.append(item)
-        else:
+        if ":" not in item_text:
             items.append(_parse_scalar(item_text))
+            continue
+
+        key, value = _split_key_value(item_text)
+        item: dict[str, Any] = {key: _parse_scalar(value)} if value else {}
+        if value == "" and index < len(lines) and lines[index][0] > line_indent:
+            item[key], index = _parse_block(lines, index, lines[index][0])
+        if index < len(lines) and lines[index][0] > line_indent:
+            extra, index = _parse_dict(lines, index, lines[index][0])
+            item.update(extra)
+        items.append(item)
 
     return items, index
 
@@ -247,23 +237,16 @@ def _split_key_value(text: str) -> tuple[str, str]:
     return key.strip(), value.strip()
 
 
-def _parse_scalar(value: str):
-    lowered = value.lower()
-    if lowered == "true":
-        return True
-    if lowered == "false":
-        return False
-    if lowered == "null":
-        return None
+def _parse_scalar(value: str) -> Any:
+    keywords = {"true": True, "false": False, "null": None}
+    if value.lower() in keywords:
+        return keywords[value.lower()]
     if value.startswith(("'", '"')) and value.endswith(("'", '"')):
         return value[1:-1]
 
-    try:
-        return int(value)
-    except ValueError:
-        pass
-
-    try:
-        return float(value)
-    except ValueError:
-        return value
+    for cast in (int, float):
+        try:
+            return cast(value)
+        except ValueError:
+            continue
+    return value

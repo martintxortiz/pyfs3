@@ -23,17 +23,13 @@ class SensorApp(Node):
     def run(self) -> None:
         while not self._stop_event.is_set():
             msg = self.get_message(self.inbox, self.settings.timeout_seconds)
-            if msg is None:
+            if msg is None or msg.payload != self.settings.command:
                 continue
-
-            if msg.payload == self.settings.command:
-                value = random.uniform(0.0, 100.0)
-                self.bus.publish(
-                    Message(
-                        topic=self.settings.output_topic,
-                        payload=f"sensor/value {value:.2f}",
-                    )
-                )
+            value = random.uniform(0.0, 100.0)
+            self.bus.publish(Message(
+                topic=self.settings.output_topic,
+                payload=f"sensor/value {value:.2f}",
+            ))
 
     def shutdown(self) -> None:
         self.log.info("Sensor app shutting down")

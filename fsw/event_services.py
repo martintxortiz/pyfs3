@@ -26,11 +26,12 @@ class EventServices:
         now = time.monotonic()
         last_sent = self._last_sent.get(event_key)
 
-        if (
-            last_sent is not None
-            and min_interval_seconds > 0
+        rate_limited = (
+            min_interval_seconds > 0
+            and last_sent is not None
             and now - last_sent < min_interval_seconds
-        ):
+        )
+        if rate_limited:
             logger.debug("Event rate limited: %s", event_key)
             return False
 

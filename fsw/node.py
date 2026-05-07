@@ -60,34 +60,27 @@ class Node(ABC):
         if not is_dataclass(config_type):
             raise TypeError("config_type must be a dataclass")
 
-        values = {}
-        known_keys = {field.name for field in fields(config_type)}
-
-        for key in sorted(set(self.config) - known_keys):
+        known_keys = {f.name for f in fields(config_type)}
+        for key in sorted(self.config.keys() - known_keys):
             self.log.warning("Unused config key ignored: %s", key)
 
-        for field in fields(config_type):
-            if field.name in self.config:
-                value = self.config[field.name]
-            elif field.default is not MISSING:
-                value = field.default
-            elif field.default_factory is not MISSING:
-                value = field.default_factory()
+        values: dict[str, Any] = {}
+        for f in fields(config_type):
+            if f.name in self.config:
+                value = self.config[f.name]
+            elif f.default is not MISSING:
+                value = f.default
+            elif f.default_factory is not MISSING:
+                value = f.default_factory()
             else:
-                raise ValueError(f"Missing required config key: {field.name}")
-
-            values[field.name] = _check_type(field.name, value, field.type)
+                raise ValueError(f"Missing required config key: {f.name}")
+            values[f.name] = _check_type(f.name, value, f.type)
 
         return config_type(**values)
 
-    def emit_event(
-        self,
-        topic: str,
-        payload: Any,
-        min_interval_seconds: float = 0.0,
-    ) -> bool:
-        key = f"{self.name}:{topic}:{payload}"
+    def emit_event(self, topic: str, payload: Any, min_interval_seconds: float = 0.0) -> bool:
         if self.events:
+            key = f"{self.name}:{topic}:{payload}"
             return self.events.emit(topic, payload, min_interval_seconds, key=key)
 
         self.bus.publish(Message(topic=topic, payload=payload))
@@ -98,11 +91,7 @@ class Node(ABC):
         self._subscriptions.append((topic, inbox))
         return inbox
 
-    def get_message(
-        self,
-        inbox: queue.Queue[Message],
-        timeout: float,
-    ) -> Message | None:
+    def get_message(self, inbox: queue.Queue[Message], timeout: float) -> Message | None:
         try:
             return inbox.get(timeout=timeout)
         except queue.Empty:

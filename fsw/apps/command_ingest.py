@@ -38,9 +38,10 @@ class CommandIngestApp(Node):
                 continue
 
             text = data.decode("utf-8", errors="replace").strip()
-            if text:
-                self.log.info("RX from %s:%s %s", address[0], address[1], text)
-                self.bus.publish(Message(topic=self.settings.output_topic, payload=text))
+            if not text:
+                continue
+            self.log.info("RX from %s:%s %s", address[0], address[1], text)
+            self.bus.publish(Message(topic=self.settings.output_topic, payload=text))
 
     def shutdown(self) -> None:
         self.sock.close()

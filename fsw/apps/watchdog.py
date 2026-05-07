@@ -29,15 +29,11 @@ class WatchdogApp(Node):
             self._check_timeout()
 
     def _check_heartbeat(self) -> None:
-        msg = self.get_message(self.inbox, self.settings.poll_seconds)
-        if msg is None:
-            return
-
-        self.last_heartbeat = time.monotonic()
+        if self.get_message(self.inbox, self.settings.poll_seconds) is not None:
+            self.last_heartbeat = time.monotonic()
 
     def _check_timeout(self) -> None:
-        now = time.monotonic()
-        if now - self.last_heartbeat < self.settings.timeout_seconds:
+        if time.monotonic() - self.last_heartbeat < self.settings.timeout_seconds:
             return
 
         sent = self.emit_event(

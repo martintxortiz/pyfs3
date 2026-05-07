@@ -82,13 +82,13 @@ class ExecutiveServices:
         logger.info("ExecutiveServices: starting all nodes")
         self._started_nodes = []
         for entry in sorted(self._nodes, key=lambda item: item.priority):
-            if entry.enabled:
-                if entry.node._start():
-                    self._started_nodes.append(entry)
-                else:
-                    self._faults[entry.node.name] = entry.node.last_error or "start failed"
-            else:
+            if not entry.enabled:
                 logger.info("[%s] disabled; not started", entry.node.name)
+                continue
+            if entry.node._start():
+                self._started_nodes.append(entry)
+            else:
+                self._faults[entry.node.name] = entry.node.last_error or "start failed"
 
     def stop(self) -> None:
         logger.info("ExecutiveServices: stopping all nodes")
@@ -138,12 +138,9 @@ class ExecutiveServices:
 
     def _find(self, name: str) -> RegisteredNode:
         entry = self._find_or_none(name)
-        if entry:
-            return entry
-        raise KeyError(f"No node named {name}")
+        if entry is None:
+            raise KeyError(f"No node named {name}")
+        return entry
 
     def _find_or_none(self, name: str) -> RegisteredNode | None:
-        for entry in self._nodes:
-            if entry.node.name == name:
-                return entry
-        return None
+        return next((e for e in self._nodes if e.node.name == name), None)

@@ -26,13 +26,12 @@ class TelemetryOutputApp(Node):
         )
 
     def run(self) -> None:
+        target = (self.settings.remote_host, self.settings.remote_port)
         while not self._stop_event.is_set():
             msg = self.get_message(self.inbox, self.settings.timeout_seconds)
             if msg is None:
                 continue
-
-            data = str(msg.payload).encode("utf-8")
-            self.sock.sendto(data, (self.settings.remote_host, self.settings.remote_port))
+            self.sock.sendto(str(msg.payload).encode("utf-8"), target)
             self.log.info("TX %s", msg.payload)
 
     def shutdown(self) -> None:

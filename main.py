@@ -8,22 +8,19 @@ ENV_PATH = ".env"
 
 def main() -> None:
     env = load_env(ENV_PATH)
-    config_path = env.get("FSW_CONFIG_PATH", CONFIG_PATH)
 
     try:
-        config = load_system_config(config_path)
+        config = load_system_config(env.get("FSW_CONFIG_PATH", CONFIG_PATH))
     except Exception as error:
         print(f"System config fault: {error}")
         return
 
     if "FSW_LOG_LEVEL" in env:
         config["logging"]["level"] = env["FSW_LOG_LEVEL"]
-
     configure_logging(config["logging"])
 
     es = ExecutiveServices.from_config_data(config)
     es.start()
-
     try:
         while True:
             time.sleep(1)

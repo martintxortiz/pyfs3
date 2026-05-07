@@ -22,13 +22,7 @@ class SubscriberApp(Node):
             msg = self.get_message(self._inbox, self.settings.poll_timeout)
             if msg is None:
                 continue
-
-            self.log.info(
-                "[%s] value=%.4f ts=%.3f",
-                msg.topic,
-                msg.payload,
-                msg.timestamp,
-            )
+            self.log.info("[%s] value=%.4f ts=%.3f", msg.topic, msg.payload, msg.timestamp)
 
     def shutdown(self) -> None:
         self.log.info("SubscriberApp shutting down")

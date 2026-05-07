@@ -31,10 +31,8 @@ class TerminalBridgeApp(Node):
 
     def _print_received(self) -> None:
         msg = self.get_message(self.inbox, self.settings.timeout_seconds)
-        if msg is None:
-            return
-
-        print(msg.payload)
+        if msg is not None:
+            print(msg.payload)
 
     def _send_typed_lines(self) -> None:
         while True:
@@ -42,7 +40,6 @@ class TerminalBridgeApp(Node):
                 line = self.lines.get_nowait()
             except queue.Empty:
                 return
-
             if line:
                 self.bus.publish(Message(topic=self.settings.output_topic, payload=line))
 

@@ -2,7 +2,7 @@ import threading
 import time
 import unittest
 
-from fsw import ExecutiveServices, Node, NodeState
+from fsw import EventServices, ExecutiveServices, Node, NodeState
 
 
 class TestNode(Node):
@@ -36,6 +36,13 @@ class CrashNode(TestNode):
         raise RuntimeError("run failed")
 
 
+class _MinimalNode(Node):
+    """A bare Node subclass that does not override ``events`` for lifecycle tracking."""
+
+    def run(self) -> None:
+        self._stop_event.wait(timeout=0.0)
+
+
 class ExecutiveServicesTests(unittest.TestCase):
     def test_register_start_and_stop_node_lifecycle(self):
         es = ExecutiveServices()
@@ -47,14 +54,7 @@ class ExecutiveServicesTests(unittest.TestCase):
         es.stop()
 
         self.assertEqual(node.events, ["init", "run", "shutdown"])
-
-    def test_executive_services_owns_single_bus(self):
-        es = ExecutiveServices()
-        node = TestNode(name="TestNode", bus=es.bus)
-
-        es.register(node)
-
-        self.assertIs(node.bus, es.bus)
+        self.assertIs(node.state, NodeState.STOPPED)
 
     def test_register_rejects_duplicate_node_names(self):
         es = ExecutiveServices()
@@ -160,6 +160,72 @@ class ExecutiveServicesTests(unittest.TestCase):
         self.assertEqual(health["BadApp"]["state"], NodeState.FAILED.value)
         self.assertIn("No module named", health["BadApp"]["error"])
         self.assertEqual(health["GoodApp"]["state"], NodeState.CREATED.value)
+
+    def test_stop_node_only_stops_the_named_node(self):
+        es = ExecutiveServices()
+        first = TestNode(name="First", bus=es.bus)
+        second = TestNode(name="Second", bus=es.bus)
+
+        es.register(first)
+        es.register(second)
+        es.start()
+        try:
+            self.assertTrue(first.started.wait(timeout=1.0))
+            self.assertTrue(second.started.wait(timeout=1.0))
+            es.stop_node("First")
+
+            self.assertIs(first.state, NodeState.STOPPED)
+            self.assertIs(second.state, NodeState.RUNNING)
+            self.assertEqual(first.events, ["init", "run", "shutdown"])
+        finally:
+            es.stop()
+
+    def test_stop_node_with_unknown_name_raises_key_error(self):
+        es = ExecutiveServices()
+
+        with self.assertRaisesRegex(KeyError, "No node named Ghost"):
+            es.stop_node("Ghost")
+
+    def test_restart_node_with_unknown_name_raises_key_error(self):
+        es = ExecutiveServices()
+
+        with self.assertRaisesRegex(KeyError, "No node named Ghost"):
+            es.restart_node("Ghost")
+
+    def test_restart_node_skipped_when_disabled(self):
+        es = ExecutiveServices()
+        node = TestNode(name="Disabled", bus=es.bus)
+
+        es.register(node, enabled=False)
+        es.start()
+        try:
+            es.restart_node("Disabled")
+        finally:
+            es.stop()
+
+        # Disabled node must never have run init/run/shutdown.
+        self.assertEqual(node.events, [])
+        self.assertIs(node.state, NodeState.CREATED)
+
+    def test_register_injects_executive_event_services_when_node_has_none(self):
+        es = ExecutiveServices()
+        node = _MinimalNode(name="MinNode", bus=es.bus)
+        self.assertIsNone(node.events)
+
+        es.register(node)
+
+        # ExecutiveServices must wire its own EventServices into nodes that lack one,
+        # so emit_event() goes through the rate-limited path.
+        self.assertIs(node.events, es.events)
+
+    def test_register_preserves_existing_event_services_on_node(self):
+        es = ExecutiveServices()
+        external = EventServices(es.bus)
+        node = _MinimalNode(name="MinNode", bus=es.bus, events=external)
+
+        es.register(node)
+
+        self.assertIs(node.events, external)
 
     def _wait_for_state(self, node: Node, state: NodeState) -> None:
         deadline = time.time() + 1.0
