@@ -1,0 +1,42 @@
+logging:
+  level: INFO
+
+bus:
+  maxsize: 200
+
+apps:
+  - name: CommandIngest
+    class: fsw.apps.command_ingest.CommandIngestApp
+    priority: 10
+    config:
+      bind_port: 5100
+      output_topic: commands/in
+
+  - name: TelemetryOutput
+    class: fsw.apps.telemetry_output.TelemetryOutputApp
+    priority: 20
+    config:
+      remote_port: 5200
+      input_topic: telemetry/out
+
+  - name: CommandHandler
+    class: examples.apps.command_handler.CommandHandlerApp
+    priority: 30
+
+  - name: SensorPublisher
+    class: examples.apps.sensor_publisher.SensorPublisherApp
+    priority: 40
+    config:
+      topic: telemetry/out
+      interval_seconds: 1.0
+
+  - name: Watchdog
+    class: fsw.apps.watchdog.WatchdogApp
+    priority: 50
+    config:
+      heartbeat_topic: heartbeat/ground_link
+      timeout_seconds: 5.0
+      alert_topic: telemetry/out
+      alert_message: GROUND_LINK_TIMEOUT
+      alert_min_interval_seconds: 5.0
+      poll_seconds: 0.2

@@ -1,35 +1,32 @@
 # pyfs3
 
-This is a small, cFS-inspired Python framework for message-driven simulation apps.
-It keeps framework code generic and puts mission/app behavior in apps.
+A small, cFS-inspired Python framework for message-driven simulation apps.
+Framework code stays generic; mission/app behavior lives in apps.
 
-## Run
+## Run the minimal example
 
 ```powershell
 python main.py
 ```
 
-The default runtime constants are in `.env`:
+`.env` selects which config to load:
 
 ```env
-FSW_CONFIG_PATH=test_usecase/config/system.yml
+FSW_CONFIG_PATH=examples/hello.yml
 FSW_LOG_LEVEL=INFO
 ```
 
-## Project Layout
+## Project layout
 
 - `fsw/` - reusable framework
-- `fsw/apps/` - small reusable framework apps
-- `test_usecase/apps/` - example apps
-- `test_comms/` - flight-side comms example
-- `test_ground_station/` - ground-side comms example
-- `test_usecase/config/` - example YAML configs
+- `fsw/apps/` - small reusable framework apps (CommandIngest, TelemetryOutput, TerminalBridge, Watchdog)
+- `examples/apps/` - example app code (HelloApp, SensorPublisherApp, PeriodicSenderApp, CommandHandlerApp)
+- `examples/*.yml` - example system configs (`hello.yml`, `flight.yml`, `ground.yml`)
 - `tests/` - unit tests
+- `tests/fixtures/` - test fixtures
 - `GUIDELINES.md` - project style rules
 
-## System Config
-
-System config controls framework-level wiring:
+## System config
 
 ```yaml
 logging:
@@ -40,10 +37,12 @@ bus:
 
 apps:
   - name: HelloApp
-    class: test_usecase.apps.hello_app.HelloApp
+    class: examples.apps.hello_app.HelloApp
     enabled: true
     priority: 30
-    config: hello_app.yml
+    config:
+      message: hi
+      interval_seconds: 1.0
 ```
 
 Rules:
@@ -55,7 +54,7 @@ Rules:
 - Wrong value types raise errors.
 - A broken app config disables only that app and is reported in health.
 
-## App Config
+## App config
 
 Each app owns its own config shape using a small dataclass:
 
@@ -81,7 +80,7 @@ This gives:
 - errors for wrong types
 - readable typed settings inside the app
 
-## Fault Tolerance
+## Fault tolerance
 
 The framework keeps failures local to the app when possible:
 
@@ -96,75 +95,54 @@ Inspect state with:
 health = es.health()
 ```
 
-Each app reports:
+Each app reports `enabled`, `priority`, `state`, `error`.
 
-- `enabled`
-- `priority`
-- `state`
-- `error`
+## Flight + ground example
 
-## UDP Comms Example
-
-Two usecases prove simple uplink/downlink over UDP:
-
-- `test_comms` listens on port `5100` and sends to `5200`.
-- `test_ground_station` listens on port `5200` and sends to `5100`.
-
-Run them in two terminals by setting `FSW_CONFIG_PATH` before `python main.py`.
+`examples/flight.yml` and `examples/ground.yml` run a two-process demo over UDP.
+Together they exercise CommandIngest, TelemetryOutput, EventServices, and Watchdog.
 
 Flight side:
 
-```powershell
-$env:FSW_CONFIG_PATH="test_comms/config/system.yml"
-python main.py
-```
+- `SensorPublisher` - publishes a random sensor value once per second over UDP.
+- `CommandHandler` - replies to `ping` with `pong`, and forwards `heartbeat` onto
+  the watchdog topic.
+- `Watchdog` - alerts (rate-limited via EventServices) if heartbeats stop.
 
 Ground side:
 
+- `Pinger` - sends `ping` every 2 s.
+- `Heartbeater` - sends `heartbeat` every 1 s.
+- `TerminalBridge` - prints incoming telemetry and forwards typed input.
+
+Run them in two terminals:
+
 ```powershell
-$env:FSW_CONFIG_PATH="test_ground_station/config/system.yml"
+# terminal 1 - flight
+$env:FSW_CONFIG_PATH="examples/flight.yml"
 python main.py
 ```
 
-Anything typed in one terminal is sent to the other side. From ground, type:
-
-```text
-sensor/get_value
+```powershell
+# terminal 2 - ground
+$env:FSW_CONFIG_PATH="examples/ground.yml"
+python main.py
 ```
 
-The flight-side `SensorApp` replies with:
+You should see the flight side logging incoming `ping`/`heartbeat`, and the
+ground side printing `pong` and `sensor/value <number>` lines.
 
-```text
-sensor/value 42.00
-```
+To verify the watchdog and EventServices, stop the ground process. After
+`timeout_seconds` (default 5 s) the flight side logs
+`GROUND_LINK_TIMEOUT` as a warning, rate-limited to one alert per
+`alert_min_interval_seconds`.
 
-Reusable framework apps:
+## Add an app
 
-- `CommandIngestApp` receives UDP text and publishes it to the bus.
-- `TelemetryOutputApp` subscribes to bus text and sends it over UDP.
-- `TerminalBridgeApp` sends terminal input and prints received messages.
-- `WatchdogApp` publishes an alert when a heartbeat topic goes quiet.
-
-Watchdog config example:
-
-```yaml
-heartbeat_topic: heartbeat/ground_link
-timeout_seconds: 10.0
-alert_topic: telemetry/out
-alert_message: GROUND_LINK_TIMEOUT
-alert_min_interval_seconds: 10.0
-poll_seconds: 0.2
-```
-
-`alert_min_interval_seconds` is the event rate limit. If the link stays down,
-the watchdog keeps checking but only sends one alert per configured interval.
-
-## Add An App
-
-1. Create a new file under `test_usecase/apps/`.
+1. Create a new file under `examples/apps/` (or your own package).
 2. Subclass `Node`.
 3. Define a config dataclass if the app needs settings.
-4. Add the app to `test_usecase/config/system.yml`.
+4. Add the app to a system YAML.
 
 The framework does not need to change.
 

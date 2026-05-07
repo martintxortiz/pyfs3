@@ -144,11 +144,11 @@ class ExecutiveServicesTests(unittest.TestCase):
                     "apps": [
                         {
                             "name": "BadApp",
-                            "class": "test_usecase.apps.missing.MissingApp",
+                            "class": "examples.apps.missing.MissingApp",
                         },
                         {
                             "name": "GoodApp",
-                            "class": "test_usecase.apps.hello_app.HelloApp",
+                            "class": "examples.apps.hello_app.HelloApp",
                             "enabled": False,
                         },
                     ]

@@ -1,0 +1,43 @@
+logging:
+  level: INFO
+
+bus:
+  maxsize: 200
+
+apps:
+  - name: CommandIngest
+    class: fsw.apps.command_ingest.CommandIngestApp
+    priority: 10
+    config:
+      bind_port: 5200
+      output_topic: commands/in
+
+  - name: TelemetryOutput
+    class: fsw.apps.telemetry_output.TelemetryOutputApp
+    priority: 20
+    config:
+      remote_port: 5100
+      input_topic: telemetry/out
+
+  - name: TerminalBridge
+    class: fsw.apps.terminal_bridge.TerminalBridgeApp
+    priority: 30
+    config:
+      input_topic: commands/in
+      output_topic: telemetry/out
+
+  - name: Pinger
+    class: examples.apps.periodic_sender.PeriodicSenderApp
+    priority: 40
+    config:
+      topic: telemetry/out
+      message: ping
+      interval_seconds: 2.0
+
+  - name: Heartbeater
+    class: examples.apps.periodic_sender.PeriodicSenderApp
+    priority: 50
+    config:
+      topic: telemetry/out
+      message: heartbeat
+      interval_seconds: 1.0

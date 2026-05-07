@@ -14,28 +14,31 @@ from fsw import (
 )
 
 
+FIXTURE_SYSTEM_YML = "tests/fixtures/system.yml"
+
+
 class ConfigTests(unittest.TestCase):
     def test_load_yaml_reads_simple_values_and_lists(self):
-        data = load_yaml("test_usecase/config/system.yml")
+        data = load_yaml(FIXTURE_SYSTEM_YML)
 
         self.assertEqual(data["bus"]["maxsize"], 100)
-        self.assertEqual(data["apps"][0]["name"], "SubscriberApp")
+        self.assertEqual(data["apps"][0]["name"], "FirstHello")
         self.assertTrue(data["apps"][0]["enabled"])
 
     def test_load_system_config_loads_app_classes_and_app_config(self):
-        config = load_system_config("test_usecase/config/system.yml")
+        config = load_system_config(FIXTURE_SYSTEM_YML)
 
         self.assertEqual(config["bus_maxsize"], 100)
         self.assertEqual(config["logging"]["level"], "INFO")
-        self.assertEqual(config["apps"][0]["name"], "SubscriberApp")
-        self.assertEqual(config["apps"][0]["config"]["topic"], "sensor/random_value")
+        self.assertEqual(config["apps"][0]["name"], "FirstHello")
+        self.assertEqual(config["apps"][0]["config"]["message"], "fixture")
         self.assertTrue(callable(config["apps"][0]["class"]))
 
     def test_executive_services_can_be_created_from_config(self):
-        es = ExecutiveServices.from_config("test_usecase/config/system.yml")
+        es = ExecutiveServices.from_config(FIXTURE_SYSTEM_YML)
 
         self.assertEqual(len(es._nodes), 3)
-        self.assertEqual(es._nodes[0].node.name, "SubscriberApp")
+        self.assertEqual(es._nodes[0].node.name, "FirstHello")
 
     def test_parse_system_config_accepts_inline_app_config(self):
         config = parse_system_config(
@@ -43,7 +46,7 @@ class ConfigTests(unittest.TestCase):
                 "apps": [
                     {
                         "name": "HelloApp",
-                        "class": "test_usecase.apps.hello_app.HelloApp",
+                        "class": "examples.apps.hello_app.HelloApp",
                         "config": {
                             "message": "hi",
                             "interval_seconds": 0.1,
@@ -61,7 +64,7 @@ class ConfigTests(unittest.TestCase):
                 "apps": [
                     {
                         "name": "HelloApp",
-                        "class": "test_usecase.apps.hello_app.HelloApp",
+                        "class": "examples.apps.hello_app.HelloApp",
                         "enabled": False,
                     }
                 ]
@@ -73,8 +76,8 @@ class ConfigTests(unittest.TestCase):
     def test_duplicate_app_names_raise_clear_error(self):
         raw = {
             "apps": [
-                {"name": "HelloApp", "class": "test_usecase.apps.hello_app.HelloApp"},
-                {"name": "HelloApp", "class": "test_usecase.apps.hello_app.HelloApp"},
+                {"name": "HelloApp", "class": "examples.apps.hello_app.HelloApp"},
+                {"name": "HelloApp", "class": "examples.apps.hello_app.HelloApp"},
             ]
         }
 
@@ -89,7 +92,7 @@ class ConfigTests(unittest.TestCase):
             "apps": [
                 {
                     "name": "HelloApp",
-                    "class": "test_usecase.apps.hello_app.HelloApp",
+                    "class": "examples.apps.hello_app.HelloApp",
                     "enabled": "false",
                 }
             ]
@@ -115,7 +118,7 @@ class ConfigTests(unittest.TestCase):
             "apps": [
                 {
                     "name": "HelloApp",
-                    "class": "test_usecase.apps.hello_app.HelloApp",
+                    "class": "examples.apps.hello_app.HelloApp",
                     "extra": 1,
                 }
             ],
@@ -135,14 +138,14 @@ class ConfigTests(unittest.TestCase):
             "apps": [
                 {
                     "name": "HelloApp",
-                    "class": "test_usecase.apps.hello_app.HelloApp",
+                    "class": "examples.apps.hello_app.HelloApp",
                     "config": "missing.yml",
                 }
             ]
         }
 
         with self.assertLogs("fsw.config", level="ERROR"):
-            config = parse_system_config(raw, root="test_usecase/config")
+            config = parse_system_config(raw, root="examples")
 
         self.assertFalse(config["apps"][0]["enabled"])
         self.assertIn("missing.yml", config["apps"][0]["fault"])
@@ -150,7 +153,7 @@ class ConfigTests(unittest.TestCase):
     def test_load_env_reads_simple_key_values(self):
         values = load_env(".env")
 
-        self.assertEqual(values["FSW_CONFIG_PATH"], "test_usecase/config/system.yml")
+        self.assertEqual(values["FSW_CONFIG_PATH"], "examples/hello.yml")
         self.assertEqual(values["FSW_LOG_LEVEL"], "INFO")
 
 
@@ -241,7 +244,7 @@ class SystemConfigErrorTests(unittest.TestCase):
         self.assertIn("missing 'class'", config["apps"][0]["fault"])
 
     def test_app_missing_name_key_becomes_app_fault(self):
-        raw = {"apps": [{"class": "test_usecase.apps.hello_app.HelloApp"}]}
+        raw = {"apps": [{"class": "examples.apps.hello_app.HelloApp"}]}
 
         with self.assertLogs("fsw.config", level="ERROR"):
             config = parse_system_config(raw)
@@ -256,7 +259,7 @@ class SystemConfigErrorTests(unittest.TestCase):
             "apps": [
                 {
                     "name": "HelloApp",
-                    "class": "test_usecase.apps.hello_app.HelloApp",
+                    "class": "examples.apps.hello_app.HelloApp",
                     "config": 42,
                 }
             ]

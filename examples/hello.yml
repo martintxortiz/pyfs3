@@ -1,0 +1,13 @@
+logging:
+  level: INFO
+
+bus:
+  maxsize: 100
+
+apps:
+  - name: HelloApp
+    class: examples.apps.hello_app.HelloApp
+    priority: 10
+    config:
+      message: hello world
+      interval_seconds: 1.0

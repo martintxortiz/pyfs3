@@ -2,7 +2,7 @@ import time
 
 from fsw import ExecutiveServices, configure_logging, load_env, load_system_config
 
-CONFIG_PATH = "test_usecase/config/system.yml"
+CONFIG_PATH = "examples/hello.yml"
 ENV_PATH = ".env"
 
 

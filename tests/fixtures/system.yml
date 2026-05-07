@@ -1,0 +1,20 @@
+logging:
+  level: INFO
+
+bus:
+  maxsize: 100
+
+apps:
+  - name: FirstHello
+    class: examples.apps.hello_app.HelloApp
+    enabled: true
+    priority: 10
+    config: first_hello.yml
+  - name: SecondHello
+    class: examples.apps.hello_app.HelloApp
+    enabled: true
+    priority: 20
+  - name: ThirdHello
+    class: examples.apps.hello_app.HelloApp
+    enabled: true
+    priority: 30

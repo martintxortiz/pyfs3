@@ -7,7 +7,7 @@ from fsw import ExecutiveServices, Message
 
 
 class UdpCommsTests(unittest.TestCase):
-    def test_ground_command_gets_flight_sensor_response(self):
+    def test_ground_ping_gets_flight_pong_response(self):
         flight_port = self._free_udp_port()
         ground_port = self._free_udp_port()
 
@@ -33,8 +33,8 @@ class UdpCommsTests(unittest.TestCase):
                         },
                     },
                     {
-                        "name": "FlightSensor",
-                        "class": "test_comms.apps.sensor_app.SensorApp",
+                        "name": "FlightCommandHandler",
+                        "class": "examples.apps.command_handler.CommandHandlerApp",
                         "priority": 30,
                     },
                 ]
@@ -69,13 +69,13 @@ class UdpCommsTests(unittest.TestCase):
         flight.start()
         ground.start()
         try:
-            ground.bus.publish(Message(topic="telemetry/out", payload="sensor/get_value"))
+            ground.bus.publish(Message(topic="telemetry/out", payload="ping"))
             response = self._wait_for_message(ground_inbox)
         finally:
             ground.stop()
             flight.stop()
 
-        self.assertTrue(response.payload.startswith("sensor/value "))
+        self.assertEqual(response.payload, "pong")
 
     def test_arbitrary_text_can_be_sent_between_sides(self):
         flight_port = self._free_udp_port()
