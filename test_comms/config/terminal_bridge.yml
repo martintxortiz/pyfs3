@@ -1,0 +1,4 @@
+input_topic: commands/in
+output_topic: telemetry/out
+prompt: "flight> "
+timeout_seconds: 0.2

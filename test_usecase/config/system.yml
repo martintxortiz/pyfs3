@@ -1,0 +1,22 @@
+logging:
+  level: INFO
+
+bus:
+  maxsize: 100
+
+apps:
+  - name: SubscriberApp
+    class: test_usecase.apps.subscriber_app.SubscriberApp
+    enabled: true
+    priority: 10
+    config: subscriber_app.yml
+  - name: PublisherApp
+    class: test_usecase.apps.publisher_app.PublisherApp
+    enabled: true
+    priority: 20
+    config: publisher_app.yml
+  - name: HelloApp
+    class: test_usecase.apps.hello_app.HelloApp
+    enabled: true
+    priority: 30
+    config: hello_app.yml

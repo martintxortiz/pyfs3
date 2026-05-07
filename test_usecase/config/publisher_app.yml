@@ -1,0 +1,4 @@
+topic: sensor/random_value
+rate_hz: 2
+min_value: 0.0
+max_value: 100.0

@@ -1,0 +1,2 @@
+topic: sensor/random_value
+poll_timeout: 0.5

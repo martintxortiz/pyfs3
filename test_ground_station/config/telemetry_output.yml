@@ -1,0 +1,4 @@
+remote_host: 127.0.0.1
+remote_port: 5100
+input_topic: telemetry/out
+timeout_seconds: 0.2
