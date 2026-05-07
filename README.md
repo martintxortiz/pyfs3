@@ -3,13 +3,21 @@
 A small, cFS-inspired Python framework for message-driven simulation apps.
 Framework code stays generic; mission/app behavior lives in apps.
 
-## Run the minimal example
+## Run
+
+Pass an example name as a positional argument:
 
 ```powershell
-python main.py
+python main.py            # default (hello)
+python main.py hello
+python main.py flight
+python main.py ground
+python main.py path/to/custom.yml
 ```
 
-`.env` selects which config to load:
+A bare name like `flight` resolves to `examples/flight.yml`. A literal path
+is used as-is. With no argument, `FSW_CONFIG_PATH` from `.env` is used,
+falling back to `examples/hello.yml`.
 
 ```env
 FSW_CONFIG_PATH=examples/hello.yml
@@ -119,14 +127,12 @@ Run them in two terminals:
 
 ```powershell
 # terminal 1 - flight
-$env:FSW_CONFIG_PATH="examples/flight.yml"
-python main.py
+python main.py flight
 ```
 
 ```powershell
 # terminal 2 - ground
-$env:FSW_CONFIG_PATH="examples/ground.yml"
-python main.py
+python main.py ground
 ```
 
 You should see the flight side logging incoming `ping`/`heartbeat`, and the
